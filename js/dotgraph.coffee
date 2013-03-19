@@ -1,4 +1,4 @@
-define [], () ->
+define ['underscore'], (_) ->
   ###
   # Objects for dealing with the Graphviz dot/xdot format.
   # After obtaining an ast using DotParser.parser(source),
@@ -237,6 +237,35 @@ define [], () ->
           @type = @rootGraph.type
           @strict = @rootGraph.strict
           return @
+
+      removeNode: (nodeId, overrideAst=true) ->
+        verbotenMap = {}
+        verbotenMap[nodeId] = true
+        edges = []
+        nodes = []
+
+        _(@ast.children).forEach (child) ->
+          switch child.type
+            when 'edge_stmt' then edges.push(child)
+            when 'node_stmt' then nodes.push(child)
+
+        validEdges = _(edges).reject (edge) ->
+          if _(edge.edge_list).any((node_id) -> !!verbotenMap[node_id.id])
+            _(_(edge.edge_list).pluck('id')).forEach (nId) ->
+              verbotenMap[nId] = true
+            true
+
+        validNodes = _(nodes).reject (node) -> !!verbotenMap[node.node_id.id]
+
+        newAst = _.extend({}, @ast, {
+          children: validNodes.concat(validEdges)
+        })
+
+        @ast = newAst if overrideAst
+        newAst
+
+      toDot: ->
+        astToStr(@ast)
 
       generateAst: ->
           genAttrsAst = (attrs) ->
